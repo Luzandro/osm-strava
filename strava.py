@@ -163,7 +163,16 @@ def overpass_request(lat_ul_merc, lon_ul_merc, lat_lr_merc, lon_lr_merc):
     lon_ul = x2lon(lon_ul_merc)
     lat_ul = y2lat(lat_ul_merc)
     lon_lr = x2lon(lon_lr_merc)
-    url = "https://overpass-api.de/api/interpreter?data=" + requests.utils.quote(f'way[highway]({lat_lr},{lon_ul},{lat_ul},{lon_lr});out geom;way[leisure=track]({lat_lr},{lon_ul},{lat_ul},{lon_lr});out geom;relation[highway]({lat_lr},{lon_ul},{lat_ul},{lon_lr});>;out geom;relation[leisure=track]({lat_lr},{lon_ul},{lat_ul},{lon_lr});>;out geom;')
+    bbox = f'{lat_lr},{lon_ul},{lat_ul},{lon_lr}'
+    url = "https://overpass-api.de/api/interpreter?data=" + requests.utils.quote(f'''
+    way[highway]({bbox});out geom;
+    relation[highway]({bbox});>;out geom;
+    way[leisure~"track|pitch|sports_centre|stadium"]({bbox});out geom;
+    relation[leisure~"track|pitch|sports_centre|stadium"]({bbox});>;out geom;
+    way["piste:type"]({bbox});out geom;
+    relation["piste:type"]({bbox});>;out geom;
+    way["aerialway"]({bbox});out geom;
+    relation["aerialway"]({bbox});>;out geom;''')
 
     for retries in range(10):
             r = requests.get(url, allow_redirects=True, stream=True)
@@ -210,7 +219,7 @@ def check_strava_tile(polygon_area, x, y, zoom):
             area = False
             coords = []
             for tag in way.iter('tag'):
-                if tag.attrib["k"] == "area" and tag.attrib["v"] == "yes":
+                if (tag.attrib["k"] == "area" and tag.attrib["v"] == "yes") or (tag.attrib["k"] == "leisure" and tag.attrib["v"] != "track"):
                     area = True
             for node in way.iter('nd'):
                 coords.append((lon2x(float(node.attrib["lon"])), lat2y(float(node.attrib["lat"])) ))
@@ -225,7 +234,7 @@ def check_strava_tile(polygon_area, x, y, zoom):
             area = False
             coords = []
             for tag in relation.iter('tag'):
-                if tag.attrib["k"] == "area" and tag.attrib["v"] == "yes":
+                if (tag.attrib["k"] == "area" and tag.attrib["v"] == "yes") or (tag.attrib["k"] == "leisure" and tag.attrib["v"] != "track"):
                     area = True
                 if tag.attrib["k"] == "type" and tag.attrib["v"] == "multipolygon":
                     area = True
